@@ -1,75 +1,3 @@
-/*
-	olc6502 - An emulation of the 6502/2A03 processor
-	"Thanks Dad for believing computers were gonna be a big deal..." - javidx9
-
-	License (OLC-3)
-	~~~~~~~~~~~~~~~
-
-	Copyright 2018-2019 OneLoneCoder.com
-
-	Redistribution and use in source and binary forms, with or without
-	modification, are permitted provided that the following conditions
-	are met:
-
-	1. Redistributions or derivations of source code must retain the above
-	copyright notice, this list of conditions and the following disclaimer.
-
-	2. Redistributions or derivative works in binary form must reproduce
-	the above copyright notice. This list of conditions and the following
-	disclaimer must be reproduced in the documentation and/or other
-	materials provided with the distribution.
-
-	3. Neither the name of the copyright holder nor the names of its
-	contributors may be used to endorse or promote products derived
-	from this software without specific prior written permission.
-
-	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-	"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-	LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-	HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-	SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-	LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-	DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-	THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-	(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-	OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-	Background
-	~~~~~~~~~~
-	I love this microprocessor. It was at the heart of two of my favourite
-	machines, the BBC Micro, and the Nintendo Entertainment System, as well
-	as countless others in that era. I learnt to program on the Model B, and
-	I learnt to love games on the NES, so in many ways, this processor is
-	why I am the way I am today.
-
-	In February 2019, I decided to undertake a selfish personal project and
-	build a NES emulator. Ive always wanted to, and as such I've avoided
-	looking at source code for such things. This made making this a real
-	personal challenge. I know its been done countless times, and very likely
-	in far more clever and accurate ways than mine, but I'm proud of this.
-
-	Datasheet: http://archive.6502.org/datasheets/rockwell_r650x_r651x.pdf
-
-	Files: olc6502.h, olc6502.cpp
-
-	Relevant Video: https://www.youtube.com/watch?v=8XmxKPJDGU0
-
-	Links
-	~~~~~
-	YouTube:	https://www.youtube.com/javidx9
-				https://www.youtube.com/javidx9extra
-	Discord:	https://discord.gg/WhwHUMV
-	Twitter:	https://www.twitter.com/javidx9
-	Twitch:		https://www.twitch.tv/javidx9
-	GitHub:		https://www.github.com/onelonecoder
-	Patreon:	https://www.patreon.com/javidx9
-	Homepage:	https://www.onelonecoder.com
-
-	Author
-	~~~~~~
-	David Barr, aka javidx9, ©OneLoneCoder 2019
-*/
 
 #include "olc6502.h"
 #include "Bus.h"
@@ -77,17 +5,7 @@
 // Constructor
 olc6502::olc6502()
 {
-	// Assembles the translation table. It's big, it's ugly, but it yields a convenient way
-	// to emulate the 6502. I'm certain there are some "code-golf" strategies to reduce this
-	// but I've deliberately kept it verbose for study and alteration
-
-	// It is 16x16 entries. This gives 256 instructions. It is arranged to that the bottom
-	// 4 bits of the instruction choose the column, and the top 4 bits choose the row.
-
-	// For convenience to get function pointers to members of this class, I'm using this
-	// or else it will be much much larger :D
-
-	// The table is one big initialiser list of initialiser lists...
+	
 	using a = olc6502;
 	lookup =
 	{
@@ -112,7 +30,7 @@ olc6502::olc6502()
 
 olc6502::~olc6502()
 {
-	// Destructor - has nothing to do
+	// Destructor
 }
 
 
@@ -121,15 +39,9 @@ olc6502::~olc6502()
 
 ///////////////////////////////////////////////////////////////////////////////
 // BUS CONNECTIVITY
-
-// Reads an 8-bit byte from the bus, located at the specified 16-bit address
 uint8_t olc6502::read(uint16_t a)
 {
-	// In normal operation "read only" is set to false. This may seem odd. Some
-	// devices on the bus may change state when they are read from, and this 
-	// is intentional under normal circumstances. However the disassembler will
-	// want to read the data at an address without changing the state of the
-	// devices on the bus
+	
 	return bus->read(a, false);
 }
 
@@ -145,14 +57,6 @@ void olc6502::write(uint16_t a, uint8_t d)
 
 ///////////////////////////////////////////////////////////////////////////////
 // EXTERNAL INPUTS
-
-// Forces the 6502 into a known state. This is hard-wired inside the CPU. The
-// registers are set to 0x00, the status register is cleared except for unused
-// bit which remains at 1. An absolute address is read from location 0xFFFC
-// which contains a second address that the program counter is set to. This 
-// allows the programmer to jump to a known and programmable location in the
-// memory to start executing from. Typically the programmer would set the value
-// at location 0xFFFC at compile time.
 void olc6502::reset()
 {
 	// Get address to set program counter to
@@ -325,8 +229,6 @@ void olc6502::clock()
 
 ///////////////////////////////////////////////////////////////////////////////
 // FLAG FUNCTIONS
-
-// Returns the value of a specific bit of the status register
 uint8_t olc6502::GetFlag(FLAGS6502 f)
 {
 	return ((status & f) > 0) ? 1 : 0;
@@ -347,17 +249,6 @@ void olc6502::SetFlag(FLAGS6502 f, bool v)
 
 ///////////////////////////////////////////////////////////////////////////////
 // ADDRESSING MODES
-
-// The 6502 can address between 0x0000 - 0xFFFF. The high byte is often referred
-// to as the "page", and the low byte is the offset into that page. This implies
-// there are 256 pages, each containing 256 bytes.
-//
-// Several addressing modes have the potential to require an additional clock
-// cycle if they cross a page boundary. This is combined with several instructions
-// that enable this additional clock cycle. So each addressing function returns
-// a flag saying it has potential, as does each instruction. If both instruction
-// and address function return 1, then an additional clock cycle is required.
-
 
 // Address Mode: Implied
 // There is no additional data required for this instruction. The instruction
@@ -589,72 +480,14 @@ uint8_t olc6502::fetch()
 ///////////////////////////////////////////////////////////////////////////////
 // INSTRUCTION IMPLEMENTATIONS
 
-// Note: Ive started with the two most complicated instructions to emulate, which
-// ironically is addition and subtraction! Ive tried to include a detailed 
-// explanation as to why they are so complex, yet so fundamental. Im also NOT
-// going to do this through the explanation of 1 and 2's complement.
+
+
 
 // Instruction: Add with Carry In
 // Function:    A = A + M + C
 // Flags Out:   C, V, N, Z
-//
-// Explanation:
-// The purpose of this function is to add a value to the accumulator and a carry bit. If
-// the result is > 255 there is an overflow setting the carry bit. Ths allows you to
-// chain together ADC instructions to add numbers larger than 8-bits. This in itself is
-// simple, however the 6502 supports the concepts of Negativity/Positivity and Signed Overflow.
-//
-// 10000100 = 128 + 4 = 132 in normal circumstances, we know this as unsigned and it allows
-// us to represent numbers between 0 and 255 (given 8 bits). The 6502 can also interpret 
-// this word as something else if we assume those 8 bits represent the range -128 to +127,
-// i.e. it has become signed.
-//
-// Since 132 > 127, it effectively wraps around, through -128, to -124. This wraparound is
-// called overflow, and this is a useful to know as it indicates that the calculation has
-// gone outside the permissable range, and therefore no longer makes numeric sense.
-//
-// Note the implementation of ADD is the same in binary, this is just about how the numbers
-// are represented, so the word 10000100 can be both -124 and 132 depending upon the 
-// context the programming is using it in. We can prove this!
-//
-//  10000100 =  132  or  -124
-// +00010001 = + 17      + 17
-//  ========    ===       ===     See, both are valid additions, but our interpretation of
-//  10010101 =  149  or  -107     the context changes the value, not the hardware!
-//
-// In principle under the -128 to 127 range:
-// 10000000 = -128, 11111111 = -1, 00000000 = 0, 00000000 = +1, 01111111 = +127
-// therefore negative numbers have the most significant set, positive numbers do not
-//
-// To assist us, the 6502 can set the overflow flag, if the result of the addition has
-// wrapped around. V <- ~(A^M) & A^(A+M+C) :D lol, let's work out why!
-//
-// Let's suppose we have A = 30, M = 10 and C = 0
-//          A = 30 = 00011110
-//          M = 10 = 00001010+
-//     RESULT = 40 = 00101000
-//
-// Here we have not gone out of range. The resulting significant bit has not changed.
-// So let's make a truth table to understand when overflow has occurred. Here I take
-// the MSB of each component, where R is RESULT.
-//
-// A  M  R | V | A^R | A^M |~(A^M) | 
-// 0  0  0 | 0 |  0  |  0  |   1   |
-// 0  0  1 | 1 |  1  |  0  |   1   |
-// 0  1  0 | 0 |  0  |  1  |   0   |
-// 0  1  1 | 0 |  1  |  1  |   0   |  so V = ~(A^M) & (A^R)
-// 1  0  0 | 0 |  1  |  1  |   0   |
-// 1  0  1 | 0 |  0  |  1  |   0   |
-// 1  1  0 | 1 |  1  |  0  |   1   |
-// 1  1  1 | 0 |  0  |  0  |   1   |
-//
-// We can see how the above equation calculates V, based on A, M and R. V was chosen
-// based on the following hypothesis:
-//       Positive Number + Positive Number = Negative Result -> Overflow
-//       Negative Number + Negative Number = Positive Result -> Overflow
-//       Positive Number + Negative Number = Either Result -> Cannot Overflow
-//       Positive Number + Positive Number = Positive Result -> OK! No Overflow
-//       Negative Number + Negative Number = Negative Result -> OK! NO Overflow
+
+// Negative Number + Negative Number = Negative Result -> OK! NO Overflow
 
 uint8_t olc6502::ADC()
 {
@@ -688,29 +521,6 @@ uint8_t olc6502::ADC()
 // Instruction: Subtraction with Borrow In
 // Function:    A = A - M - (1 - C)
 // Flags Out:   C, V, N, Z
-//
-// Explanation:
-// Given the explanation for ADC above, we can reorganise our data
-// to use the same computation for addition, for subtraction by multiplying
-// the data by -1, i.e. make it negative
-//
-// A = A - M - (1 - C)  ->  A = A + -1 * (M - (1 - C))  ->  A = A + (-M + 1 + C)
-//
-// To make a signed positive number negative, we can invert the bits and add 1
-// (OK, I lied, a little bit of 1 and 2s complement :P)
-//
-//  5 = 00000101
-// -5 = 11111010 + 00000001 = 11111011 (or 251 in our 0 to 255 range)
-//
-// The range is actually unimportant, because if I take the value 15, and add 251
-// to it, given we wrap around at 256, the result is 10, so it has effectively 
-// subtracted 5, which was the original intention. (15 + 251) % 256 = 10
-//
-// Note that the equation above used (1-C), but this got converted to + 1 + C.
-// This means we already have the +1, so all we need to do is invert the bits
-// of M, the data(!) therfore we can simply add, exactly the same way we did 
-// before.
-
 uint8_t olc6502::SBC()
 {
 	fetch();
@@ -1465,10 +1275,6 @@ bool olc6502::complete()
 	return cycles == 0;
 }
 
-// This is the disassembly function. Its workings are not required for emulation.
-// It is merely a convenience function to turn the binary instruction code into
-// human readable form. Its included as part of the emulator because it can take
-// advantage of many of the CPUs internal operations to do this.
 std::map<uint16_t, std::string> olc6502::disassemble(uint16_t nStart, uint16_t nStop)
 {
 	uint32_t addr = nStart;
@@ -1590,4 +1396,4 @@ std::map<uint16_t, std::string> olc6502::disassemble(uint16_t nStart, uint16_t n
 	return mapLines;
 }
 
-// End of File - Jx9
+// End of File
