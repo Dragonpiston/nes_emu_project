@@ -18,7 +18,11 @@ Bus::~Bus()
 
 void Bus::cpuWrite(uint16_t addr, uint8_t data)
 {
-	if (addr >= 0x0000 && addr <= 0x1FFF)
+	if (cart->cpuWrite(addr, data)) //for optimization
+	{
+
+	}
+	else if (addr >= 0x0000 && addr <= 0x1FFF)
 	{
 		cpuRam[addr & 0x07FF] = data;
 	}
@@ -33,8 +37,11 @@ void Bus::cpuWrite(uint16_t addr, uint8_t data)
 uint8_t Bus::cpuRead(uint16_t addr, bool bReadOnly)
 {
 	uint8_t data = 0x00;
+	if (cart->cpuRead(addr, data)) //for optimization
+	{
 
-	if (addr >= 0x0000 && addr <= 0x1FFF)
+	}
+	else if (addr >= 0x0000 && addr <= 0x1FFF)
 	{
 		data = cpuRam [addr & 0x07FF];
 	}
