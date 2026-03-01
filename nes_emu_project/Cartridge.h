@@ -21,6 +21,8 @@ private:
 	uint8_t nPRGBanks = 0;
 	uint8_t nCHRBanks = 0;
 
+	std::shared_ptr<Mapper> pMapper;
+
 public:
 	bool cpuRead(uint16_t addr, uint8_t& data);
 	bool cpuWrite(uint16_t addr, uint8_t data);
