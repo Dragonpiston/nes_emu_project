@@ -16,46 +16,56 @@ Cartridge::Cartridge(const std::string& sFileName)
 		char unused[5];
 	}header;
 
+	bImageValid = false;
+
 	std::ifstream ifs;
 	ifs.open(sFileName, std::ifstream::binary);
-	if (header.mapper1 & 0x04)
-		ifs.seekg(512, std::ifstream::cur);
-
-	nMapperID = ((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4);
-
-	uint8_t nFileType = 1;
-
-	if (nFileType == 0)
+	if (ifs.is_open())
 	{
+		// Read file header
+		ifs.read((char*)&header, sizeof(sHeader));
+		//reading past trainer
+		if (header.mapper1 & 0x04)
+			ifs.seekg(512, std::ios_base::cur);
+
+		// Determine Mapper ID
+		nMapperID = ((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4);
+		mirror = (header.mapper1 & 0x01) ? VERTICAL : HORIZONTAL;
+
+		// File Format
+		uint8_t nFileType = 1;
+
+		if (nFileType == 0)
+		{
+
+		}
+
+		if (nFileType == 1)
+		{
+			nPRGBanks = header.prg_rom_chunks;
+			vPRGMemory.resize(nPRGBanks * 16384);
+			ifs.read((char*)vPRGMemory.data(), vPRGMemory.size());
+
+			nCHRBanks = header.chr_rom_chunks;
+			vCHRMemory.resize(nCHRBanks * 8192);
+			ifs.read((char*)vCHRMemory.data(), vCHRMemory.size());
+		}
+
+		if (nFileType == 2)
+		{
+
+		}
+
+		// Load appropriate mapper
+		switch (nMapperID)
+		{
+		case 0: pMapper = std::make_shared<Mapper_000>(nPRGBanks, nCHRBanks); break;
+		}
+
+		bImageValid = true;
+		ifs.close();
 	}
-
-	if(nFileType == 1)
-	{
-		nPRGBanks = header.prg_rom_chunks;
-		vPRGMemory.resize(nPRGBanks * 16384);
-		ifs.read((char*)vPRGMemory.data(), vPRGMemory.size());
-
-		nCHRBanks = header.chr_rom_chunks;
-		vCHRMemory.resize(nCHRBanks * 8192);
-		ifs.read((char*)vCHRMemory.data(), vCHRMemory.size());
-
-	}
-
-	if (nFileType == 2)
-	{
-	}
-
-	switch (nMapperID)
-	{
-		case 0:
-			pMapper = std::make_shared<Mapper_000>(nPRGBanks, nCHRBanks);
-			break; 
-	}
-
-
-	ifs.close();
 }
-
 Cartridge::~Cartridge()
 {
 }
@@ -106,4 +116,9 @@ bool Cartridge::ppuWrite(uint16_t addr, uint8_t data)
 	}
 	else
 		return false;
+}
+
+bool Cartridge::ImageValid()
+{
+	return bImageValid;
 }

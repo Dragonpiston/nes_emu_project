@@ -7,8 +7,6 @@ Bus::Bus()
 	// Connect CPU to communication bus
 	cpu.ConnectBus(this);
 
-	// Clear RAM contents
-	for (auto& i : cpuRam) i = 0x00;
 }
 
 
@@ -63,4 +61,14 @@ void Bus::reset()
 {
 	cpu.reset();
 	nSystemClockCounter = 0;
+}
+
+void Bus::clock()
+{
+	ppu.clock();
+
+	if (nSystemClockCounter % 3 == 0)
+		cpu.clock();
+
+	nSystemClockCounter++;
 }

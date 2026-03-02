@@ -34,5 +34,23 @@ private:
 public:
 	void ConnectCartridge(const std::shared_ptr<Cartridge>& cartridge);
 	void clock();
+
+private:
+	olc::Pixel  palScreen[0x40];
+	olc::Sprite* sprScreen;
+	olc::Sprite* sprNameTable[2];
+	olc::Sprite* sprPatternTable[2];
+
+public:
+	// Debugging Utilities
+	olc::Sprite& GetScreen();
+	olc::Sprite& GetNameTable(uint8_t i);
+	olc::Sprite& GetPatternTable(uint8_t i);
+	bool frame_complete = false;
+
+private:
+	int16_t scanline = 0; //row
+	int16_t cycle = 0; //col
+
 };
 
