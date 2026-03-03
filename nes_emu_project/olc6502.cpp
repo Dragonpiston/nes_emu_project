@@ -2,7 +2,6 @@
 #include "olc6502.h"
 #include "Bus.h"
 
-// Constructor
 olc6502::olc6502()
 {
 	
@@ -30,14 +29,8 @@ olc6502::olc6502()
 
 olc6502::~olc6502()
 {
-	// Destructor
 }
 
-
-
-
-
-///////////////////////////////////////////////////////////////////////////////
 // BUS CONNECTIVITY
 uint8_t olc6502::read(uint16_t a)
 {
@@ -55,7 +48,6 @@ void olc6502::write(uint16_t a, uint8_t d)
 
 
 
-///////////////////////////////////////////////////////////////////////////////
 // EXTERNAL INPUTS
 void olc6502::reset()
 {
@@ -84,32 +76,18 @@ void olc6502::reset()
 }
 
 
-// Interrupt requests are a complex operation and only happen if the
-// "disable interrupt" flag is 0. IRQs can happen at any time, but
-// you don't want them to be destructive to the operation of the running 
-// program. Therefore the current instruction is allowed to finish
-// (which I facilitate by doing the whole thing when cycles == 0) and 
-// then the current program counter is stored on the stack. Then the
-// current status register is stored on the stack. When the routine
-// that services the interrupt has finished, the status register
-// and program counter can be restored to how they where before it 
-// occurred. This is implemented by the "RTI" instruction. Once the IRQ
-// has happened, in a similar way to a reset, a programmable address
-// is read form hard coded location 0xFFFE, which is subsequently
-// set to the program counter.
+
 void olc6502::irq()
 {
-	// If interrupts are allowed
 	if (GetFlag(I) == 0)
 	{
-		// Push the program counter to the stack. It's 16-bits dont
-		// forget so that takes two pushes
+		// Push the program counter to the stack, two pushes since its 16 bits
 		write(0x0100 + stkp, (pc >> 8) & 0x00FF);
 		stkp--;
 		write(0x0100 + stkp, pc & 0x00FF);
 		stkp--;
 
-		// Then Push the status register to the stack
+		// Push the status register to the stack
 		SetFlag(B, 0);
 		SetFlag(U, 1);
 		SetFlag(I, 1);
@@ -122,15 +100,13 @@ void olc6502::irq()
 		uint16_t hi = read(addr_abs + 1);
 		pc = (hi << 8) | lo;
 
-		// IRQs take time
+		// takes long time
 		cycles = 7;
 	}
 }
 
 
-// A Non-Maskable Interrupt cannot be ignored. It behaves in exactly the
-// same way as a regular IRQ, but reads the new program counter address
-// form location 0xFFFA.
+// this interrupt cannot be ignored
 void olc6502::nmi()
 {
 	write(0x0100 + stkp, (pc >> 8) & 0x00FF);
@@ -155,21 +131,10 @@ void olc6502::nmi()
 // Perform one clock cycles worth of emulation
 void olc6502::clock()
 {
-	// Each instruction requires a variable number of clock cycles to execute.
-	// In my emulation, I only care about the final result and so I perform
-	// the entire computation in one hit. In hardware, each clock cycle would
-	// perform "microcode" style transformations of the CPUs state.
-	//
-	// To remain compliant with connected devices, it's important that the 
-	// emulation also takes "time" in order to execute instructions, so I
-	// implement that delay by simply counting down the cycles required by 
-	// the instruction. When it reaches 0, the instruction is complete, and
-	// the next one is ready to be executed.
+	// all instructions require variable clock cycles
 	if (cycles == 0)
 	{
-		// Read next instruction byte. This 8-bit value is used to index
-		// the translation table to get the relevant information about
-		// how to implement the instruction
+		// read the next instruction(opcode)
 		opcode = read(pc);
 
 #ifdef LOGMODE
@@ -185,24 +150,20 @@ void olc6502::clock()
 		// Get Starting number of cycles
 		cycles = lookup[opcode].cycles;
 
-		// Perform fetch of intermmediate data using the
-		// required addressing mode
+		// get additional cycles if mentioned in table
 		uint8_t additional_cycle1 = (this->*lookup[opcode].addrmode)();
 
 		// Perform operation
 		uint8_t additional_cycle2 = (this->*lookup[opcode].operate)();
 
-		// The addressmode and opcode may have altered the number
-		// of cycles this instruction requires before its completed
+		// add additional cycles together and store in global variable
 		cycles += (additional_cycle1 & additional_cycle2);
 
 		// Always set the unused status flag bit to 1
 		SetFlag(U, true);
 
 #ifdef LOGMODE
-		// This logger dumps every cycle the entire processor state for analysis.
-		// This can be used for debugging the emulation, but has little utility
-		// during emulation. Its also very slow, so only use if you have to.
+		// used for debugging during emulation
 		if (logfile == nullptr)	logfile = fopen("olc6502.txt", "wt");
 		if (logfile != nullptr)
 		{
@@ -215,11 +176,10 @@ void olc6502::clock()
 #endif
 	}
 
-	// Increment global clock count - This is actually unused unless logging is enabled
-	// but I've kept it in because its a handy watch variable for debugging
+
 	clock_count++;
 
-	// Decrement the number of cycles remaining for this instruction
+	// no of cycles remaining decremented
 	cycles--;
 }
 
@@ -227,7 +187,6 @@ void olc6502::clock()
 
 
 
-///////////////////////////////////////////////////////////////////////////////
 // FLAG FUNCTIONS
 uint8_t olc6502::GetFlag(FLAGS6502 f)
 {
@@ -247,13 +206,11 @@ void olc6502::SetFlag(FLAGS6502 f, bool v)
 
 
 
-///////////////////////////////////////////////////////////////////////////////
+
 // ADDRESSING MODES
 
-// Address Mode: Implied
-// There is no additional data required for this instruction. The instruction
-// does something very simple like like sets a status bit. However, we will
-// target the accumulator, for instructions like PHA
+//Implied
+// no additional data required, does small tasks like setting a register on/off
 uint8_t olc6502::IMP()
 {
 	fetched = a;
@@ -261,9 +218,8 @@ uint8_t olc6502::IMP()
 }
 
 
-// Address Mode: Immediate
-// The instruction expects the next byte to be used as a value, so we'll prep
-// the read address to point to the next byte
+// Immediate
+// instruction expects the next byte to be used as a value
 uint8_t olc6502::IMM()
 {
 	addr_abs = pc++;
@@ -272,10 +228,8 @@ uint8_t olc6502::IMM()
 
 
 
-// Address Mode: Zero Page
-// To save program bytes, zero page addressing allows you to absolutely address
-// a location in first 0xFF bytes of address range. Clearly this only requires
-// one byte instead of the usual two.
+// Zero Page
+// since the page is locked in at 0 for this it only requires one byte for the offset and the high byte is assumed as 0x00.
 uint8_t olc6502::ZP0()
 {
 	addr_abs = read(pc);
@@ -286,10 +240,9 @@ uint8_t olc6502::ZP0()
 
 
 
-// Address Mode: Zero Page with X Offset
-// Fundamentally the same as Zero Page addressing, but the contents of the X Register
-// is added to the supplied single byte address. This is useful for iterating through
-// ranges within the first page.
+// Zero Page with X Offset
+// Same as above but uses X Register for offset. If the offset causes the address to wrap around the page, it does so. 
+// If the instruction is at 0x00FF and the X Register is 0x01, then the effective address will be 0x0000, not 0x0100
 uint8_t olc6502::ZPX()
 {
 	addr_abs = (read(pc) + x);
@@ -299,7 +252,7 @@ uint8_t olc6502::ZPX()
 }
 
 
-// Address Mode: Zero Page with Y Offset
+// Zero Page with Y Offset
 // Same as above but uses Y Register for offset
 uint8_t olc6502::ZPY()
 {
@@ -310,10 +263,8 @@ uint8_t olc6502::ZPY()
 }
 
 
-// Address Mode: Relative
-// This address mode is exclusive to branch instructions. The address
-// must reside within -128 to +127 of the branch instruction, i.e.
-// you cant directly branch to any address in the addressable range.
+// Relative
+// exclusive for branch instructions and range is -128 to +127. so it cant branch to entire addressable range
 uint8_t olc6502::REL()
 {
 	addr_rel = read(pc);
@@ -324,7 +275,7 @@ uint8_t olc6502::REL()
 }
 
 
-// Address Mode: Absolute 
+// Absolute 
 // A full 16-bit address is loaded and used
 uint8_t olc6502::ABS()
 {
@@ -339,10 +290,8 @@ uint8_t olc6502::ABS()
 }
 
 
-// Address Mode: Absolute with X Offset
-// Fundamentally the same as absolute addressing, but the contents of the X Register
-// is added to the supplied two byte address. If the resulting address changes
-// the page, an additional clock cycle is required
+// Absolute with X Offset
+// Same with content of X register added to supplied address. It offset causes page to change one more clock cycle is required.
 uint8_t olc6502::ABX()
 {
 	uint16_t lo = read(pc);
@@ -360,10 +309,8 @@ uint8_t olc6502::ABX()
 }
 
 
-// Address Mode: Absolute with Y Offset
-// Fundamentally the same as absolute addressing, but the contents of the Y Register
-// is added to the supplied two byte address. If the resulting address changes
-// the page, an additional clock cycle is required
+// Absolute with Y Offset
+// same as above but with y register 
 uint8_t olc6502::ABY()
 {
 	uint16_t lo = read(pc);
@@ -382,14 +329,16 @@ uint8_t olc6502::ABY()
 
 // Note: The next 3 address modes use indirection (aka Pointers!)
 
-// Address Mode: Indirect
-// The supplied 16-bit address is read to get the actual 16-bit address. This is
-// instruction is unusual in that it has a bug in the hardware! To emulate its
+// Indirect
+// the 16 bit address supplied is used to get the actual 16-bit address. So its a pointer to a pointer.
+// BUG EXPLAINED: 
+// this instruction is unusual in that it has a bug in the hardware! To emulate its
 // function accurately, we also need to emulate this bug. If the low byte of the
 // supplied address is 0xFF, then to read the high byte of the actual address
 // we need to cross a page boundary. This doesnt actually work on the chip as 
 // designed, instead it wraps back around in the same page, yielding an 
 // invalid actual address
+
 uint8_t olc6502::IND()
 {
 	uint16_t ptr_lo = read(pc);
@@ -412,8 +361,8 @@ uint8_t olc6502::IND()
 }
 
 
-// Address Mode: Indirect X
-// The supplied 8-bit address is offset by X Register to index
+// Indirect X
+// the supplied 8-bit address is offset by X Register to index
 // a location in page 0x00. The actual 16-bit address is read 
 // from this location
 uint8_t olc6502::IZX()
@@ -430,7 +379,7 @@ uint8_t olc6502::IZX()
 }
 
 
-// Address Mode: Indirect Y
+// Indirect Y
 // The supplied 8-bit address indexes a location in page 0x00. From 
 // here the actual 16-bit address is read, and the contents of
 // Y Register is added to it to offset it. If the offset causes a
@@ -454,18 +403,7 @@ uint8_t olc6502::IZY()
 
 
 
-// This function sources the data used by the instruction into 
-// a convenient numeric variable. Some instructions dont have to 
-// fetch data as the source is implied by the instruction. For example
-// "INX" increments the X register. There is no additional data
-// required. For all other addressing modes, the data resides at 
-// the location held within addr_abs, so it is read from there. 
-// Immediate adress mode exploits this slightly, as that has
-// set addr_abs = pc + 1, so it fetches the data from the
-// next byte for example "LDA $FF" just loads the accumulator with
-// 256, i.e. no far reaching memory fetch is required. "fetched"
-// is a variable global to the CPU, and is set by calling this 
-// function. It also returns it for convenience.
+// fetched is a variable global to the cpu
 uint8_t olc6502::fetch()
 {
 	if (!(lookup[opcode].addrmode == &olc6502::IMP))
@@ -477,13 +415,12 @@ uint8_t olc6502::fetch()
 
 
 
-///////////////////////////////////////////////////////////////////////////////
-// INSTRUCTION IMPLEMENTATIONS
+// INSTRUCTION IMPLEMENTATIONS or OPCODES
 
 
 
 
-// Instruction: Add with Carry In
+// Add with Carry In
 // Function:    A = A + M + C
 // Flags Out:   C, V, N, Z
 
@@ -491,34 +428,33 @@ uint8_t olc6502::fetch()
 
 uint8_t olc6502::ADC()
 {
-	// Grab the data that we are adding to the accumulator
+	// data to add
 	fetch();
 
-	// Add is performed in 16-bit domain for emulation to capture any
-	// carry bit, which will exist in bit 8 of the 16-bit word
+	// add is performed in 16 bit domain to capture carry out
 	temp = (uint16_t)a + (uint16_t)fetched + (uint16_t)GetFlag(C);
 
-	// The carry flag out exists in the high byte bit 0
+	// setting carry to high byte bit 0
 	SetFlag(C, temp > 255);
 
-	// The Zero flag is set if the result is 0
+	// zero flag set if result zero
 	SetFlag(Z, (temp & 0x00FF) == 0);
 
-	// The signed Overflow flag is set based on all that up there! :D
+	// The signed Overflow flag is set 
 	SetFlag(V, (~((uint16_t)a ^ (uint16_t)fetched) & ((uint16_t)a ^ (uint16_t)temp)) & 0x0080);
 
 	// The negative flag is set to the most significant bit of the result
 	SetFlag(N, temp & 0x80);
 
-	// Load the result into the accumulator (it's 8-bit dont forget!)
+	// load the result into accumulator which is actually 8 bit so truncate it to 8 bits
 	a = temp & 0x00FF;
 
-	// This instruction has the potential to require an additional clock cycle
+	//additional clock cycle might be there
 	return 1;
 }
 
 
-// Instruction: Subtraction with Borrow In
+// Subtraction with Borrow In
 // Function:    A = A - M - (1 - C)
 // Flags Out:   C, V, N, Z
 uint8_t olc6502::SBC()
@@ -527,10 +463,10 @@ uint8_t olc6502::SBC()
 
 	// Operating in 16-bit domain to capture carry out
 
-	// We can invert the bottom 8 bits with bitwise xor
+	// We can invert the bottom 8 bits with bitwise xor 2's compliment
 	uint16_t value = ((uint16_t)fetched) ^ 0x00FF;
 
-	// Notice this is exactly the same as addition from here!
+	// same as addition
 	temp = (uint16_t)a + value + (uint16_t)GetFlag(C);
 	SetFlag(C, temp & 0xFF00);
 	SetFlag(Z, ((temp & 0x00FF) == 0));
@@ -540,17 +476,10 @@ uint8_t olc6502::SBC()
 	return 1;
 }
 
-// OK! Complicated operations are done! the following are much simpler
-// and conventional. The typical order of events is:
-// 1) Fetch the data you are working with
-// 2) Perform calculation
-// 3) Store the result in desired place
-// 4) Set Flags of the status register
-// 5) Return if instruction has potential to require additional 
-//    clock cycle
 
 
-// Instruction: Bitwise Logic AND
+
+// Bitwise Logic AND
 // Function:    A = A & M
 // Flags Out:   N, Z
 uint8_t olc6502::AND()
@@ -563,7 +492,7 @@ uint8_t olc6502::AND()
 }
 
 
-// Instruction: Arithmetic Shift Left
+// Arithmetic Shift Left
 // Function:    A = C <- (A << 1) <- 0
 // Flags Out:   N, Z, C
 uint8_t olc6502::ASL()
@@ -581,7 +510,7 @@ uint8_t olc6502::ASL()
 }
 
 
-// Instruction: Branch if Carry Clear
+// Branch if Carry Clear
 // Function:    if(C == 0) pc = address 
 uint8_t olc6502::BCC()
 {
@@ -599,7 +528,7 @@ uint8_t olc6502::BCC()
 }
 
 
-// Instruction: Branch if Carry Set
+// Branch if Carry Set
 // Function:    if(C == 1) pc = address
 uint8_t olc6502::BCS()
 {
@@ -617,7 +546,7 @@ uint8_t olc6502::BCS()
 }
 
 
-// Instruction: Branch if Equal
+// Branch if Equal
 // Function:    if(Z == 1) pc = address
 uint8_t olc6502::BEQ()
 {
@@ -645,7 +574,7 @@ uint8_t olc6502::BIT()
 }
 
 
-// Instruction: Branch if Negative
+// Branch if Negative
 // Function:    if(N == 1) pc = address
 uint8_t olc6502::BMI()
 {
@@ -663,7 +592,7 @@ uint8_t olc6502::BMI()
 }
 
 
-// Instruction: Branch if Not Equal
+// Branch if Not Equal
 // Function:    if(Z == 0) pc = address
 uint8_t olc6502::BNE()
 {
@@ -681,7 +610,7 @@ uint8_t olc6502::BNE()
 }
 
 
-// Instruction: Branch if Positive
+// Branch if Positive
 // Function:    if(N == 0) pc = address
 uint8_t olc6502::BPL()
 {
@@ -698,7 +627,7 @@ uint8_t olc6502::BPL()
 	return 0;
 }
 
-// Instruction: Break
+// Break
 // Function:    Program Sourced Interrupt
 uint8_t olc6502::BRK()
 {
@@ -720,7 +649,7 @@ uint8_t olc6502::BRK()
 }
 
 
-// Instruction: Branch if Overflow Clear
+// Branch if Overflow Clear
 // Function:    if(V == 0) pc = address
 uint8_t olc6502::BVC()
 {
@@ -738,7 +667,7 @@ uint8_t olc6502::BVC()
 }
 
 
-// Instruction: Branch if Overflow Set
+// Branch if Overflow Set
 // Function:    if(V == 1) pc = address
 uint8_t olc6502::BVS()
 {
@@ -756,7 +685,9 @@ uint8_t olc6502::BVS()
 }
 
 
-// Instruction: Clear Carry Flag
+//flag opcodes
+
+// Clear Carry Flag
 // Function:    C = 0
 uint8_t olc6502::CLC()
 {
@@ -765,7 +696,7 @@ uint8_t olc6502::CLC()
 }
 
 
-// Instruction: Clear Decimal Flag
+// Clear Decimal Flag
 // Function:    D = 0
 uint8_t olc6502::CLD()
 {
@@ -774,7 +705,7 @@ uint8_t olc6502::CLD()
 }
 
 
-// Instruction: Disable Interrupts / Clear Interrupt Flag
+// Clear Interrupt Flag
 // Function:    I = 0
 uint8_t olc6502::CLI()
 {
@@ -783,7 +714,7 @@ uint8_t olc6502::CLI()
 }
 
 
-// Instruction: Clear Overflow Flag
+// Clear Overflow Flag
 // Function:    V = 0
 uint8_t olc6502::CLV()
 {
@@ -791,7 +722,11 @@ uint8_t olc6502::CLV()
 	return 0;
 }
 
-// Instruction: Compare Accumulator
+
+//comparison opcodes
+ 
+
+// Compare Accumulator
 // Function:    C <- A >= M      Z <- (A - M) == 0
 // Flags Out:   N, C, Z
 uint8_t olc6502::CMP()
@@ -805,7 +740,7 @@ uint8_t olc6502::CMP()
 }
 
 
-// Instruction: Compare X Register
+// Compare X Register
 // Function:    C <- X >= M      Z <- (X - M) == 0
 // Flags Out:   N, C, Z
 uint8_t olc6502::CPX()
@@ -819,7 +754,7 @@ uint8_t olc6502::CPX()
 }
 
 
-// Instruction: Compare Y Register
+// Compare Y Register
 // Function:    C <- Y >= M      Z <- (Y - M) == 0
 // Flags Out:   N, C, Z
 uint8_t olc6502::CPY()
@@ -833,7 +768,7 @@ uint8_t olc6502::CPY()
 }
 
 
-// Instruction: Decrement Value at Memory Location
+// Decrement Value at Memory Location
 // Function:    M = M - 1
 // Flags Out:   N, Z
 uint8_t olc6502::DEC()
@@ -847,7 +782,7 @@ uint8_t olc6502::DEC()
 }
 
 
-// Instruction: Decrement X Register
+// Decrement X Register
 // Function:    X = X - 1
 // Flags Out:   N, Z
 uint8_t olc6502::DEX()
@@ -1001,10 +936,7 @@ uint8_t olc6502::LSR()
 
 uint8_t olc6502::NOP()
 {
-	// Sadly not all NOPs are equal, Ive added a few here
-	// based on https://wiki.nesdev.com/w/index.php/CPU_unofficial_opcodes
-	// and will add more based on game compatibility, and ultimately
-	// I'd like to cover all illegal opcodes too
+	// not defined opcodes
 	switch (opcode) {
 	case 0x1C:
 	case 0x3C:
@@ -1042,7 +974,7 @@ uint8_t olc6502::PHA()
 }
 
 
-// Instruction: Push Status Register to Stack
+// Push Status Register to Stack
 // Function:    status -> stack
 // Note:        Break flag is set to 1 before push
 uint8_t olc6502::PHP()
@@ -1055,7 +987,7 @@ uint8_t olc6502::PHP()
 }
 
 
-// Instruction: Pop Accumulator off Stack
+// Pop Accumulator off Stack
 // Function:    A <- stack
 // Flags Out:   N, Z
 uint8_t olc6502::PLA()
@@ -1068,7 +1000,7 @@ uint8_t olc6502::PLA()
 }
 
 
-// Instruction: Pop Status Register off Stack
+// Pop Status Register off Stack
 // Function:    Status <- stack
 uint8_t olc6502::PLP()
 {

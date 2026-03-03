@@ -15,7 +15,7 @@ public:
 	Demo_olc2C02() { sAppName = "olc2C02 Demonstration"; }
 
 private:
-	// The NES
+	// The NES+-
 	Bus nes;
 	std::shared_ptr<Cartridge> cart;
 	bool bEmulationRun = false;
