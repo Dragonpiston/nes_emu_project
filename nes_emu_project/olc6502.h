@@ -17,7 +17,7 @@
 class Bus;
 
 
-// The 6502 Emulation Class. This is it!
+// 6502 class
 class olc6502
 {
 public:
@@ -25,8 +25,7 @@ public:
 	~olc6502();
 
 public:
-	// CPU Core registers, exposed as public here for ease of access from external
-	// examinors. This is all the 6502 has.
+	// CPU Core registers
 	uint8_t  a = 0x00;		// Accumulator Register
 	uint8_t  x = 0x00;		// X Register
 	uint8_t  y = 0x00;		// Y Register
@@ -44,7 +43,7 @@ public:
 
 	bool complete();
 
-	// Link this CPU to a communications bus
+	// cpu com bus linkage
 	void ConnectBus(Bus* n) { bus = n; }
 
 	// Produces a map of strings, with keys equivalent to instruction start locations
@@ -67,7 +66,7 @@ public:
 	};
 
 private:
-	// Convenience functions to access status register
+	// Convenience functions=
 	uint8_t GetFlag(FLAGS6502 f);
 	void    SetFlag(FLAGS6502 f, bool v);
 
