@@ -95,11 +95,14 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool bReadOnly)
 
 	switch (addr)
 	{
-	case 0x0000: // Control
+	case 0x0000:// Control
 		break;
 	case 0x0001: // Mask
 		break;
 	case 0x0002: // Status
+		data = (status.reg & 0xE0) | (ppu_data_buffer & 0x1F);
+		status.vertical_blank = 0;
+		address_latch = 0;
 		break;
 	case 0x0003: // OAM Address
 		break;
@@ -109,7 +112,11 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool bReadOnly)
 		break;
 	case 0x0006: // PPU Address
 		break;
-	case 0x0007: // PPU Data
+	case 0x0007:// PPU Data
+		data = ppu_data_buffer;
+		ppu_data_buffer = ppuRead(ppu_address);
+		if (ppu_address > 0x3f00) data = ppu_data_buffer;
+		ppu_address++;
 		break;
 	}
 
@@ -121,8 +128,10 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 	switch (addr)
 	{
 	case 0x0000: // Control
+		control.reg = data;
 		break;
 	case 0x0001: // Mask
+		mask.reg = data;
 		break;
 	case 0x0002: // Status
 		break;
@@ -133,8 +142,20 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 	case 0x0005: // Scroll
 		break;
 	case 0x0006: // PPU Address
+		if (address_latch == 0)
+		{
+			ppu_address = (ppu_address & 0x00FF) | (data << 8);
+			address_latch = 1;
+		}
+		else
+		{
+			ppu_address = (ppu_address & 0xFF00) | data;
+			address_latch = 0;
+		}
 		break;
 	case 0x0007: // PPU Data
+		ppuWrite(ppu_address, data);
+		ppu_address++;
 		break;
 	}
 }
@@ -244,6 +265,19 @@ olc::Pixel& olc2C02::GetColourFromPaletteRam(uint8_t palette, uint8_t pixel)
 
 void olc2C02::clock()
 {
+	if (scanline == -1 && cycle == 1)
+	{
+		status.vertical_blank = 0;
+	}
+
+	if (scanline == 241 && cycle == 1)
+	{
+		status.vertical_blank = 1;
+		if (control.enable_nmi)
+		{
+			nmi = true;
+		}
+	}
 
 	//generating noise
 	sprScreen->SetPixel(cycle - 1, scanline, palScreen[(rand() % 2) ? 0x3F : 0x30]);
